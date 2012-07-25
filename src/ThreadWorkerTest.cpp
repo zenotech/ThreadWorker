@@ -27,7 +27,6 @@ int main()
 
   ThreadWorker worker[4];
 
-  /*
   worker[0].setTag(__FILE__, __LINE__);
   worker[0].call(boost::bind(testFunc0));
 
@@ -39,6 +38,6 @@ int main()
   worker[0].call(boost::bind(testFunc2,a,boost::ref(b)));
   if(b != 3)
     return EXIT_FAILURE;
-*/
+
   return EXIT_SUCCESS;
 }
