@@ -1,0 +1,30 @@
+#-----------------------------------------------------------------------------
+# @PROJECT_NAME@Config.cmake - AlignedAllocator CMake configuration file for external projects.
+#
+# This file is configured by @PROJECT_NAME@ and used by the Use@PROJECT_NAME@.cmake module
+# to load @PROJECT_NAME@'s settings for an external project.
+
+# The @PROJECT_NAME@ include file directories.
+SET(@PROJECT_NAME@_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include")
+
+# The @PROJECT_NAME@ library directories.
+SET(@PROJECT_NAME@_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/lib")
+
+# The CME version number.
+SET(@PROJECT_NAME@_VERSION_MAJOR "@MAJOR_VERSION@")
+SET(@PROJECT_NAME@_VERSION_MINOR "@MINOR_VERSION@")
+
+# The location of the Use@PROJECT_NAME@.cmake file.
+SET(@PROJECT_NAME@_USE_FILE "@CMAKE_INSTALL_PREFIX@/lib/Use@PROJECT_NAME@.cmake")
+
+# The build settings file.
+SET(@PROJECT_NAME@_BUILD_SETTINGS_FILE
+    "@CMAKE_INSTALL_PREFIX@/lib/CMEBuildSettings.cmake")
+
+# The @PROJECT_NAME@ library dependencies.  These can be blocked by projects
+# not interested in linking to @PROJECT_NAME@'s library.
+IF(NOT @PROJECT_NAME@_NO_LIBRARY_DEPENDS)
+  INCLUDE("@CMAKE_INSTALL_PREFIX@/lib/@PROJECT_NAME@LibraryDepends.cmake")
+ENDIF(NOT @PROJECT_NAME@_NO_LIBRARY_DEPENDS)
+
+# Additional project-specific configuration settings can be set here.
