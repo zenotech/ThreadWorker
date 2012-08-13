@@ -52,8 +52,7 @@ THE POSSIBILITY OF SUCH DAMAGE.
 \brief Defines the ThreadWorker class
 */
 
-#ifndef __THREADWORKER_H__
-#define __THREADWORKER_H__
+#pragma once
 
 #include <deque>
 #include <stdexcept>
@@ -78,6 +77,8 @@ THE POSSIBILITY OF SUCH DAMAGE.
 #include <cuda_runtime_api.h>
 #endif
 
+namespace threadworker
+{
 
 //! Implements a worker thread controlling a single GPU
 /*! CUDA requires one thread per GPU in multiple GPU code. It is not always
@@ -209,17 +210,21 @@ private:
 };
 
 
+namespace detail
+{
 #ifdef HAVE_CUDA
 /*
  * Helper function to trap CUDA errors in the correct format
  */
   inline ThreadWorker::error_t cudaFunc(const boost::function<cudaError_t (void) > &func)
   {
+    printf("Calling");
+    fflush(stdout);
     cudaError_t cudaErr = func();
     ThreadWorker::error_t success = (cudaErr == cudaSuccess ? ThreadWorker::cuda_success : ThreadWorker::cuda_error);
     return success;
   }
 #endif
+}
 
-#endif
-
+} // threadworker

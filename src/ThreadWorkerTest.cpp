@@ -5,6 +5,7 @@
 
 #include "ThreadWorker.h"
 
+namespace threadworker{
 ThreadWorker::error_t testFunc0(){
 
   return ThreadWorker::host_success;
@@ -20,11 +21,11 @@ ThreadWorker::error_t testFunc2(int a, int &b){
   b++;
   return ThreadWorker::host_success;
 }
-
+}
 
 int main()
 {
-
+  using namespace threadworker;
   ThreadWorker worker[4];
 
   worker[0].setTag(__FILE__, __LINE__);

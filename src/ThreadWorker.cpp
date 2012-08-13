@@ -10,6 +10,8 @@
 using namespace boost;
 using namespace std;
 
+namespace threadworker{
+
 /*
 Constructing a ThreadWorker creates the worker thread 
 */
@@ -151,7 +153,7 @@ a return value not equal to cudaSuccess.
 void ThreadWorker::sync()
 {
 #ifdef HAVE_CUDA
-  callAsync(boost::bind(cudaThreadSynchronize));
+  callAsync(boost::bind(cudaDeviceSynchronize));
 #endif
 
   // wait on the work done signal
@@ -274,4 +276,5 @@ void ThreadWorker::performWorkLoop()
   }
 }
 
+} // threadworker
 
