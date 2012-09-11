@@ -54,6 +54,7 @@ THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <cstdio>
 #include <deque>
 #include <stdexcept>
 
