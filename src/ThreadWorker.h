@@ -161,13 +161,13 @@ public:
   ~ThreadWorker();
 
   //! Makes a synchronous function call executed by the worker thread
-  void call(const boost::function< error_t (void) > &func, int device=-1);
+  void call(const boost::function< error_t (void) > &func, int device);
 
   //! Queues an asynchronous function call to be executed by the worker thread
-  void callAsync(const boost::function< error_t (void) > &func, int device=-1);
+  void callAsync(const boost::function< error_t (void) > &func, int device);
 
   //! Blocks the calling thread until all queued calls have been executed
-  void sync();
+  void sync(int device);
 
   //! Tag the current location in the code
   void setTag(const std::string &file, unsigned int line);

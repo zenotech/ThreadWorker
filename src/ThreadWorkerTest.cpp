@@ -29,14 +29,14 @@ int main()
   ThreadWorker worker[4];
 
   worker[0].setTag(__FILE__, __LINE__);
-  worker[0].call(boost::bind(testFunc0));
+  worker[0].call(boost::bind(testFunc0),-1);
 
-  worker[0].callAsync(boost::bind(testFunc0));
-  worker[0].sync();
+  worker[0].callAsync(boost::bind(testFunc0),-1);
+  worker[0].sync(-1);
   int a=1;
-  worker[0].call(boost::bind(testFunc1,a));
+  worker[0].call(boost::bind(testFunc1,a),-1);
   int b=2;
-  worker[0].call(boost::bind(testFunc2,a,boost::ref(b)));
+  worker[0].call(boost::bind(testFunc2,a,boost::ref(b)),-1);
   if(b != 3)
     return EXIT_FAILURE;
 

@@ -93,16 +93,10 @@ cudaSuccess.
   // still isn't supported
   mutex::scoped_lock lock(m_call_mutex);
 
-#ifdef HAVE_CUDA
-  if(device != -1)
-    {
-      callAsync(boost::bind(cudaSetDevice,device));
-    }
-#endif
 
   // call and then sync
-  callAsync(func);
-  sync();
+  callAsync(func,device);
+  sync(device);
 }
 
 
@@ -165,10 +159,12 @@ cudaThreadSynchronize()
 sync() will throw an exception if any of the queued calls resulted in
 a return value not equal to cudaSuccess.
 */
-void ThreadWorker::sync()
+  void ThreadWorker::sync(int device)
 {
+
 #ifdef HAVE_CUDA
-  callAsync(boost::bind(cudaDeviceSynchronize));
+  if(device != -1)
+     callAsync(boost::bind(cudaDeviceSynchronize),device);
 #endif
 
   // wait on the work done signal
