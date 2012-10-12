@@ -83,7 +83,7 @@ multiple GPUs simultaneously which can only be done with asynchronous calls.
 An exception will be thrown if the CUDA call returns anything other than
 cudaSuccess.
 */
-void ThreadWorker::call(const boost::function< ThreadWorker::error_t (void) > &func)
+  void ThreadWorker::call(const boost::function< ThreadWorker::error_t (void) > &func, int device)
 {
   // this mutex lock is to prevent multiple threads from making
   // simultaneous calls. Thus, they can depend on the exception
@@ -93,10 +93,18 @@ void ThreadWorker::call(const boost::function< ThreadWorker::error_t (void) > &f
   // still isn't supported
   mutex::scoped_lock lock(m_call_mutex);
 
+#ifdef HAVE_CUDA
+  if(device != -1)
+    {
+      callAsync(boost::bind(cudaSetDevice,device));
+    }
+#endif
+
   // call and then sync
   callAsync(func);
   sync();
 }
+
 
 /*! \param func Function to execute inside the worker thread
 
@@ -128,11 +136,18 @@ destructor of any class that passes pointers to member variables into callAsync(
 The best practice to avoid problems is to always call sync() at the end of any function 
 that uses callAsync().
 */
-void ThreadWorker::callAsync(const boost::function< ThreadWorker::error_t (void) > &func)
+  void ThreadWorker::callAsync(const boost::function< ThreadWorker::error_t (void) > &func,int device)
 {
   // add the function object to the queue
   {
     mutex::scoped_lock lock(m_mutex);
+#ifdef HAVE_CUDA
+   if(device != -1)
+    {
+      m_work_queue.push_back(boost::bind(cudaSetDevice,device));
+    }
+#endif
+
     m_work_queue.push_back(func);
     m_work_to_do = true;
   }

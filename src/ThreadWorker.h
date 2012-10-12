@@ -161,10 +161,10 @@ public:
   ~ThreadWorker();
 
   //! Makes a synchronous function call executed by the worker thread
-  void call(const boost::function< error_t (void) > &func);
+  void call(const boost::function< error_t (void) > &func, int device=-1);
 
   //! Queues an asynchronous function call to be executed by the worker thread
-  void callAsync(const boost::function< error_t (void) > &func);
+  void callAsync(const boost::function< error_t (void) > &func, int device=-1);
 
   //! Blocks the calling thread until all queued calls have been executed
   void sync();
