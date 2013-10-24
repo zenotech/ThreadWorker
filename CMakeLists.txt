@@ -38,8 +38,9 @@ SET(${PROJECT_NAME}_SRCS
 	src/ThreadWorker.cpp)
 
 
-SET(Boost_ADDITIONAL_VERSIONS "1.44" "1.44.0" "1.43" "1.43.0" "1.42" "1.42.0" "1.41" ) 
-FIND_PACKAGE(Boost 1.41 REQUIRED COMPONENTS  thread system)
+#SET(Boost_ADDITIONAL_VERSIONS "1.44" "1.44.0" "1.43" "1.43.0" "1.42" "1.42.0" "1.41" ) 
+SET(Boost_NO_SYSTEM_PATHS ON)
+FIND_PACKAGE(Boost 1.52 REQUIRED COMPONENTS  thread system)
 link_directories ( ${Boost_LIBRARY_DIRS} )
 include_directories ( ${Boost_INCLUDE_DIRS} )
 message(STATUS "Boost found in : " ${Boost_INCLUDE_DIRS})
