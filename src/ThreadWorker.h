@@ -151,7 +151,7 @@ public:
     all_success  = 0x3,
     host_error   = 0x4,
     cuda_error   = 0x8,
-    all_error    = 0x12,
+    all_error    = 0xC,
   };
 
   //! Creates a worker thread
