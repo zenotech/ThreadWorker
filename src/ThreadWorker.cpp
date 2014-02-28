@@ -29,7 +29,7 @@ ThreadWorker::~ThreadWorker()
 {
   // set the exit condition
   {
-    mutex::scoped_lock lock(m_mutex);
+    boost::mutex::scoped_lock lock(m_mutex);
     m_work_to_do = true;
     m_exit = true;
   }
@@ -91,7 +91,7 @@ cudaSuccess.
   // race condition from another thread
   // making ThreadWorker calls to a single ThreadWorker from multiple threads 
   // still isn't supported
-  mutex::scoped_lock lock(m_call_mutex);
+  boost::mutex::scoped_lock lock(m_call_mutex);
 
 
   // call and then sync
@@ -134,7 +134,7 @@ that uses callAsync().
 {
   // add the function object to the queue
   {
-    mutex::scoped_lock lock(m_mutex);
+    boost::mutex::scoped_lock lock(m_mutex);
 #ifdef HAVE_CUDA
    if(device != -1)
     {
@@ -169,7 +169,7 @@ a return value not equal to cudaSuccess.
 
   // wait on the work done signal
   // wait on the work done signal
-  mutex::scoped_lock lock(m_mutex);
+  boost::mutex::scoped_lock lock(m_mutex);
   while (m_work_to_do)
     m_cond_work_done.wait(lock);
 
@@ -235,7 +235,7 @@ void ThreadWorker::performWorkLoop()
   {
     // aquire the lock and wait until there is work to do
     {
-      mutex::scoped_lock lock(m_mutex);
+      boost::mutex::scoped_lock lock(m_mutex);
       while (!m_work_to_do)
         m_cond_work_to_do.wait(lock);
 
@@ -268,7 +268,7 @@ void ThreadWorker::performWorkLoop()
     // reaquire the lock so we can update m_last_error and 
     // notify that we are done
     {
-      mutex::scoped_lock lock(m_mutex);
+      boost::mutex::scoped_lock lock(m_mutex);
 
       // update m_last_error only if it is cudaSuccess
       // this is done so that any error that occurs will propagate through
