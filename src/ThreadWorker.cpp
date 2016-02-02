@@ -166,6 +166,11 @@ a return value not equal to cudaSuccess.
   if(device != -1)
      callAsync(boost::bind(cudaDeviceSynchronize),device);
 #endif
+  // If we support intel offload need to wait on all streams
+  if(device != -1){
+    #pragma offload_wait stream(0)
+  }
+
 
   // wait on the work done signal
   // wait on the work done signal
