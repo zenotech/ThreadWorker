@@ -1,6 +1,36 @@
 # -*- CMake -*-  ---------------------------------------------------------
 
 cmake_minimum_required(VERSION 2.6)
+option(INTEL_CC "Use the Intel compiler." OFF)
+option(IBM_XL "Use IBM compiler." OFF)
+
+# Detect Intel Compiler - Note this needs to be before the project statement to work correctly
+if (INTEL_CC)
+  find_program(CMAKE_C_COMPILER NAMES icc)
+  find_program(CMAKE_CXX_COMPILER NAMES icpc)
+  find_program(CMAKE_AR NAMES xiar)
+  find_program(CMAKE_LINKER NAMES xild)
+
+  if (CMAKE_C_COMPILER MATCHES CMAKE_C_COMPILER-NOTFOUND OR
+      CMAKE_CXX_COMPILER MATCHES CMAKE_CXX_COMPILER-NOTFOUND OR
+      CMAKE_AR MATCHES CMAKE_AR-NOTFOUND OR
+      CMAKE_LINKER MATCHES CMAKE_LINKER-NOTFOUND)
+    message(FATAL_ERROR "Cannot find Intel compiler.  You may need to run `. /opt/intel/bin/compilervars.sh intel64'")
+  endif ()
+endif (INTEL_CC)
+if (IBM_XL)
+  find_program(CMAKE_C_COMPILER NAMES xlc)
+  find_program(CMAKE_CXX_COMPILER NAMES xlc++)
+  find_program(CMAKE_AR NAMES ar)
+  find_program(CMAKE_LINKER NAMES ld)
+  if (CMAKE_C_COMPILER MATCHES CMAKE_C_COMPILER-NOTFOUND OR
+      CMAKE_CXX_COMPILER MATCHES CMAKE_CXX_COMPILER-NOTFOUND OR
+      CMAKE_AR MATCHES CMAKE_AR-NOTFOUND OR
+      CMAKE_LINKER MATCHES CMAKE_LINKER-NOTFOUND)
+    message(FATAL_ERROR "Cannot find IBM compiler.")
+  endif ()
+endif ()
+
 project(ThreadWorker)
 
 # project version
@@ -8,15 +38,6 @@ SET(MAJOR_VERSION 0)
 SET(MINOR_VERSION 1)
 SET(PATCH_VERSION 0)
 
-#FIND_PACKAGE(Subversion)
-#IF(Subversion_FOUND)
-#    Subversion_WC_INFO(${PROJECT_SOURCE_DIR} Project)
-#    MESSAGE("Current revision is ${Project_WC_REVISION}")
-#    #Subversion_WC_LOG(${PROJECT_SOURCE_DIR} Project)
-#    #MESSAGE("Last changed log is ${Project_LAST_CHANGED_LOG}")
-#
-#    SET (PATCH_VERSION ${PATCH_VERSION}.${Project_WC_REVISION})
-#ENDIF(Subversion_FOUND)
 
 SET(PACKAGE_NAME ${PROJECT_NAME})
 SET(PACKAGE_TARNAME ${PROJECT_NAME})
