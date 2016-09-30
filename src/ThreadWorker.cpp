@@ -13,7 +13,7 @@ using namespace std;
 namespace threadworker{
 
 /*
-Constructing a ThreadWorker creates the worker thread 
+Constructing a ThreadWorker creates the worker thread
 */
 ThreadWorker::ThreadWorker() : m_exit(false), m_work_to_do(false), m_last_error(ThreadWorker::all_success)
 {
@@ -77,7 +77,7 @@ call() ensures that \a func has been executed before it returns. This is
 desired behavior, most of the time. For calling kernels or other asynchronous
 CUDA functions, use callAsync(), but read the warnings in it's documentation
 carefully and understand what you are doing. Why have callAsync() at all?
-The original purpose for designing ThreadWorker is to allow execution on 
+The original purpose for designing ThreadWorker is to allow execution on
 multiple GPUs simultaneously which can only be done with asynchronous calls.
 
 An exception will be thrown if the CUDA call returns anything other than
@@ -89,7 +89,7 @@ cudaSuccess.
   // simultaneous calls. Thus, they can depend on the exception
   // thrown to exactly be the error from their call and not some
   // race condition from another thread
-  // making ThreadWorker calls to a single ThreadWorker from multiple threads 
+  // making ThreadWorker calls to a single ThreadWorker from multiple threads
   // still isn't supported
   boost::mutex::scoped_lock lock(m_call_mutex);
 
@@ -102,9 +102,9 @@ cudaSuccess.
 
 /*! \param func Function to execute inside the worker thread
 
-callAsync is like call(), but  returns immeadiately after entering \a func into the queue. 
+callAsync is like call(), but  returns immeadiately after entering \a func into the queue.
 The worker thread will eventually get around to running it. Multiple contiguous
-calls to callAsync() will result in potentially many function calls 
+calls to callAsync() will result in potentially many function calls
 being queued before any run.
 
 \warning There are many potential race conditions when using callAsync().
@@ -127,7 +127,7 @@ callAsync and uses pointers to stack variables in the call, sync() \b must be ca
 at the end of the function to avoid problems. Similarly, sync() must be called in the
 destructor of any class that passes pointers to member variables into callAsync().
 
-The best practice to avoid problems is to always call sync() at the end of any function 
+The best practice to avoid problems is to always call sync() at the end of any function
 that uses callAsync().
 */
   void ThreadWorker::callAsync(const boost::function< ThreadWorker::error_t (void) > &func,int device)
@@ -152,7 +152,7 @@ that uses callAsync().
 
 /*! Call sync() to synchronize the master thread with the worker thread.
 After a call to sync() returns, it is guarunteed that all previous
-queued calls (via callAsync()) have been called in the worker thread. 
+queued calls (via callAsync()) have been called in the worker thread.
 For the CUDA enabled version of the library this will also call
 cudaThreadSynchronize()
 
@@ -176,7 +176,7 @@ a return value not equal to cudaSuccess.
   // wait on the work done signal
   boost::mutex::scoped_lock lock(m_mutex);
   while (m_work_to_do)
-    m_cond_work_done.wait(lock);
+    m_cond_work_done.timed_wait(lock, boost::posix_time::milliseconds(1000));
 
 
   // if there was an error
@@ -203,7 +203,7 @@ a return value not equal to cudaSuccess.
 
     // throw
     throw(error);
-  }	
+  }
 }
 
 
@@ -223,7 +223,7 @@ void ThreadWorker::setTag(const std::string &file, unsigned int line)
 The worker thread spawns a loop that continusously checks the condition variable
 m_cond_work_to_do. As soon as it is signaled that there is work to do with
 m_work_to_do, it processes all queued calls. After all calls are made,
-m_work_to_do is set to false and m_cond_work_done is notified for anyone 
+m_work_to_do is set to false and m_cond_work_done is notified for anyone
 interested (namely, sync()). During the work, m_exit is also checked. If m_exit
 is true, then the worker thread exits.
 */
@@ -242,7 +242,7 @@ void ThreadWorker::performWorkLoop()
     {
       boost::mutex::scoped_lock lock(m_mutex);
       while (!m_work_to_do)
-        m_cond_work_to_do.wait(lock);
+        m_cond_work_to_do.timed_wait(lock, boost::posix_time::milliseconds(1000));
 
       // check for the exit condition
       if (m_exit)
@@ -270,7 +270,7 @@ void ThreadWorker::performWorkLoop()
       pong_queue.pop_front();
     }
 
-    // reaquire the lock so we can update m_last_error and 
+    // reaquire the lock so we can update m_last_error and
     // notify that we are done
     {
       boost::mutex::scoped_lock lock(m_mutex);
