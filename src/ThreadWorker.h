@@ -33,7 +33,7 @@ Disclaimer
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND
 CONTRIBUTORS ``AS IS''  AND ANY EXPRESS OR IMPLIED WARRANTIES,
 INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
 
 IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS  BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
@@ -87,20 +87,20 @@ convenient to write multiple-threaded code where all threads are peers.
 Sometimes, a master/slave approach can be the simplest and quickest to write.
 
 ThreadWorker provides the underlying worker threads that a master/slave
-approach needs to execute on multiple GPUs. It is designed so that 
-a \b single thread can own multiple ThreadWorkers, each of whom execute on 
+approach needs to execute on multiple GPUs. It is designed so that
+a \b single thread can own multiple ThreadWorkers, each of whom execute on
 their own GPU. The master thread can call any CUDA function on that GPU
 by passing a bound boost::function into call() or callAsync(). Internally, these
 calls are executed inside the worker thread so that they all share the same
 CUDA context.
 
 On construction, a ThreadWorker is automatically associated with a device. You
-pass in an integer device number which is used to call cudaSetDevice() 
-in the worker thread. 
+pass in an integer device number which is used to call cudaSetDevice()
+in the worker thread.
 
 After the ThreadWorker is constructed, you can make calls on the GPU
 by submitting them with call(). To queue calls, use callAsync(), but
-please read carefully and understand the race condition warnings before 
+please read carefully and understand the race condition warnings before
 using callAsync(). sync() can be used to synchronize the master thread
 with the worker thread. If any called GPU function returns an error,
 call() (or the sync() after a callAsync()) will throw a std::runtime_error.
@@ -111,7 +111,7 @@ boost::shared_ptr<ThreadWorker> gpu(new ThreadWorker(dev));
 gpu->call(whatever...)
 SomeClass cls(gpu);
 // now cls can use gpu to execute in the same worker thread as everybody else
-\endcode	
+\endcode
 
 \warning A single ThreadWorker is intended to be used by a \b single master thread
 (though master threads can use multiple ThreadWorkers). If a single ThreadWorker is
@@ -141,7 +141,7 @@ public:
   static error_t success;
 #else
   typedef int error_t;
-  enum {success = 1}; 
+  enum {success = 1};
 #endif
 */
   typedef int error_t;
@@ -174,10 +174,10 @@ public:
 
 private:
   //! Flag to indicate the worker thread is to exit
-  bool m_exit;
+  volatile bool m_exit;
 
   //! Flag to indicate there is work to do
-  bool m_work_to_do;
+  volatile bool m_work_to_do;
 
   //! Error from last cuda call
   error_t m_last_error;
