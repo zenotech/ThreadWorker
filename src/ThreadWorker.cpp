@@ -168,7 +168,7 @@ a return value not equal to cudaSuccess.
 #endif
   // If we support intel offload need to wait on all streams
   if(device != -1){
-    #pragma offload_wait stream(0)
+    #pragma offload_wait target(mic0) stream(0)
   }
 
 
