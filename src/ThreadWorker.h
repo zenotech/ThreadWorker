@@ -57,12 +57,10 @@ THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstdio>
 #include <deque>
 #include <stdexcept>
-
-#include <boost/function.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
+#include <functional>
+#include <thread>
+#include <condition_variable>
 
 #ifdef WIN32
 #  if defined ThreadWorker_EXPORTS || defined ThreadWorkerCUDA_EXPORTS
@@ -90,7 +88,7 @@ ThreadWorker provides the underlying worker threads that a master/slave
 approach needs to execute on multiple GPUs. It is designed so that
 a \b single thread can own multiple ThreadWorkers, each of whom execute on
 their own GPU. The master thread can call any CUDA function on that GPU
-by passing a bound boost::function into call() or callAsync(). Internally, these
+by passing a bound std::function into call() or callAsync(). Internally, these
 calls are executed inside the worker thread so that they all share the same
 CUDA context.
 
@@ -161,10 +159,10 @@ public:
   ~ThreadWorker();
 
   //! Makes a synchronous function call executed by the worker thread
-  void call(const boost::function< error_t (void) > &func, int device);
+  void call(const std::function< error_t (void) > &func, int device);
 
   //! Queues an asynchronous function call to be executed by the worker thread
-  void callAsync(const boost::function< error_t (void) > &func, int device);
+  void callAsync(const std::function< error_t (void) > &func, int device);
 
   //! Blocks the calling thread until all queued calls have been executed
   void sync(int device);
@@ -189,22 +187,22 @@ private:
   unsigned int m_tagged_line;
 
   //! The queue of function calls to make
-  std::deque< boost::function< error_t (void) > > m_work_queue;
+  std::deque< std::function< error_t (void) > > m_work_queue;
 
   //! Mutex for accessing m_exit, m_work_queue, m_work_to_do, and m_last_error
-  boost::mutex m_mutex;
+  std::mutex m_mutex;
 
   //! Mutex for syncing after every operation
-  boost::mutex m_call_mutex;
+  std::mutex m_call_mutex;
 
   //! Condition variable to signal m_work_to_do = true
-  boost::condition m_cond_work_to_do;
+  std::condition_variable m_cond_work_to_do;
 
   //! Condition variable to signal m_work_to_do = false (work is complete)
-  boost::condition m_cond_work_done;
+  std::condition_variable m_cond_work_done;
 
   //! Thread
-  boost::scoped_ptr<boost::thread> m_thread;
+  std::unique_ptr<std::thread> m_thread;
 
   //! Worker thread loop
   void performWorkLoop();
@@ -217,7 +215,7 @@ namespace detail
 /*
  * Helper function to trap CUDA errors in the correct format
  */
-  inline ThreadWorker::error_t cudaFunc(const boost::function<cudaError_t (void) > &func)
+  inline ThreadWorker::error_t cudaFunc(const std::function<cudaError_t (void) > &func)
   {
     printf("Calling");
     fflush(stdout);

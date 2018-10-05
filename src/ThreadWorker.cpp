@@ -2,13 +2,13 @@
 
 #include "ThreadWorker.h"
 
-#include <boost/bind.hpp>
+#include <chrono>
 #include <string>
 #include <sstream>
 #include <iostream>
 
-using namespace boost;
 using namespace std;
+using namespace std::chrono_literals;
 
 namespace threadworker{
 
@@ -29,7 +29,7 @@ ThreadWorker::~ThreadWorker()
 {
   // set the exit condition
   {
-    boost::mutex::scoped_lock lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     m_work_to_do = true;
     m_exit = true;
   }
@@ -83,7 +83,7 @@ multiple GPUs simultaneously which can only be done with asynchronous calls.
 An exception will be thrown if the CUDA call returns anything other than
 cudaSuccess.
 */
-  void ThreadWorker::call(const boost::function< ThreadWorker::error_t (void) > &func, int device)
+  void ThreadWorker::call(const std::function< ThreadWorker::error_t (void) > &func, int device)
 {
   // this mutex lock is to prevent multiple threads from making
   // simultaneous calls. Thus, they can depend on the exception
@@ -91,7 +91,7 @@ cudaSuccess.
   // race condition from another thread
   // making ThreadWorker calls to a single ThreadWorker from multiple threads
   // still isn't supported
-  boost::mutex::scoped_lock lock(m_call_mutex);
+  std::lock_guard<std::mutex> lock(m_call_mutex);
 
 
   // call and then sync
@@ -130,15 +130,15 @@ destructor of any class that passes pointers to member variables into callAsync(
 The best practice to avoid problems is to always call sync() at the end of any function
 that uses callAsync().
 */
-  void ThreadWorker::callAsync(const boost::function< ThreadWorker::error_t (void) > &func,int device)
+  void ThreadWorker::callAsync(const std::function< ThreadWorker::error_t (void) > &func,int device)
 {
   // add the function object to the queue
   {
-    boost::mutex::scoped_lock lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
 #ifdef HAVE_CUDA
    if(device != -1)
     {
-      m_work_queue.push_back(boost::bind(cudaSetDevice,device));
+      m_work_queue.push_back([device] { return cudaSetDevice(device); });
     }
 #endif
 
@@ -164,7 +164,7 @@ a return value not equal to cudaSuccess.
 
 #ifdef HAVE_CUDA
   if(device != -1)
-     callAsync(boost::bind(cudaDeviceSynchronize),device);
+     callAsync([] { return cudaDeviceSynchronize(); }, device);
 #endif
   // If we support intel offload need to wait on all streams
   if(device != -1){
@@ -174,9 +174,11 @@ a return value not equal to cudaSuccess.
 
   // wait on the work done signal
   // wait on the work done signal
-  boost::mutex::scoped_lock lock(m_mutex);
-  while (m_work_to_do)
-    m_cond_work_done.timed_wait(lock, boost::posix_time::milliseconds(1000));
+  std::unique_lock<std::mutex> lock(m_mutex);
+  while (m_work_to_do) {
+    auto now = std::chrono::system_clock::now();
+    m_cond_work_done.wait_until(lock, now + 1000ms);
+  }
 
 
   // if there was an error
@@ -234,16 +236,17 @@ void ThreadWorker::performWorkLoop()
   // temporary queue to ping-pong with the m_work_queue
   // this is done so that jobs can be added to m_work_queue while
   // the worker thread is emptying pong_queue
-  deque< boost::function< error_t (void) > > pong_queue;
+  deque< std::function< error_t (void) > > pong_queue;
 
   while (working)
   {
     // aquire the lock and wait until there is work to do
     {
-      boost::mutex::scoped_lock lock(m_mutex);
-      while (!m_work_to_do)
-        m_cond_work_to_do.timed_wait(lock, boost::posix_time::milliseconds(1000));
-
+      std::unique_lock<std::mutex> lock(m_mutex);
+      while (!m_work_to_do) {
+        auto now = std::chrono::system_clock::now();
+        m_cond_work_to_do.wait_until(lock, now + 1000ms);
+      }
       // check for the exit condition
       if (m_exit)
         working = false;
@@ -273,7 +276,7 @@ void ThreadWorker::performWorkLoop()
     // reaquire the lock so we can update m_last_error and
     // notify that we are done
     {
-      boost::mutex::scoped_lock lock(m_mutex);
+      std::lock_guard<std::mutex> lock(m_mutex);
 
       // update m_last_error only if it is cudaSuccess
       // this is done so that any error that occurs will propagate through
