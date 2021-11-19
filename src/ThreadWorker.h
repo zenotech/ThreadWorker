@@ -63,21 +63,22 @@ THE POSSIBILITY OF SUCH DAMAGE.
 #include <condition_variable>
 
 #ifdef WIN32
-#  if defined ThreadWorker_EXPORTS || defined ThreadWorkerCUDA_EXPORTS
-#    define THREADWORKER_EXPORT __declspec(dllexport)
-#  else
-#    define THREADWORKER_EXPORT __declspec(dllimport)
-#  endif
+#if defined ThreadWorker_EXPORTS || defined ThreadWorkerCUDA_EXPORTS
+#define THREADWORKER_EXPORT __declspec(dllexport)
 #else
-#  define THREADWORKER_EXPORT
+#define THREADWORKER_EXPORT __declspec(dllimport)
+#endif
+#else
+#define THREADWORKER_EXPORT
 #endif
 
 #ifdef HAVE_CUDA
 #include <cuda_runtime_api.h>
+#elif defined HAVE_HIP
+#include <hip/hip_runtime_api.h>
 #endif
 
-namespace threadworker
-{
+namespace threadworker {
 
 //! Implements a worker thread controlling a single GPU
 /*! CUDA requires one thread per GPU in multiple GPU code. It is not always
@@ -129,101 +130,107 @@ in order to be able to call CUDA runtime API functions with boost::bind.
 \ingroup utils
 */
 
-
-class THREADWORKER_EXPORT ThreadWorker
-{
+class THREADWORKER_EXPORT ThreadWorker {
 public:
-  /*
-#ifdef HAVE_CUDA
-  typedef cudaError_t error_t;
-  static error_t success;
-#else
-  typedef int error_t;
-  enum {success = 1};
-#endif
-*/
-  typedef int error_t;
-  enum{
-    host_success = 0x1,
-    cuda_success = 0x2,
-    all_success  = 0x3,
-    host_error   = 0x4,
-    cuda_error   = 0x8,
-    all_error    = 0xC,
-  };
+    /*
+  #ifdef HAVE_CUDA
+    typedef cudaError_t error_t;
+    static error_t success;
+  #else
+    typedef int error_t;
+    enum {success = 1};
+  #endif
+  */
+    typedef int error_t;
+    enum {
+        host_success = 0x1,
+        cuda_success = 0x2,
+        all_success = 0x3,
+        host_error = 0x4,
+        cuda_error = 0x8,
+        all_error = 0xC,
+    };
 
-  //! Creates a worker thread
-  ThreadWorker();
+    //! Creates a worker thread
+    ThreadWorker();
 
-  //! Destructor
-  ~ThreadWorker();
+    //! Destructor
+    ~ThreadWorker();
 
-  //! Makes a synchronous function call executed by the worker thread
-  void call(const std::function< error_t (void) > &func, int device);
+    //! Makes a synchronous function call executed by the worker thread
+    void call(const std::function<error_t(void)>& func, int device);
 
-  //! Queues an asynchronous function call to be executed by the worker thread
-  void callAsync(const std::function< error_t (void) > &func, int device);
+    //! Queues an asynchronous function call to be executed by the worker thread
+    void callAsync(const std::function<error_t(void)>& func, int device);
 
-  //! Blocks the calling thread until all queued calls have been executed
-  void sync(int device);
+    //! Blocks the calling thread until all queued calls have been executed
+    void sync(int device);
 
-  //! Tag the current location in the code
-  void setTag(const std::string &file, unsigned int line);
+    //! Tag the current location in the code
+    void setTag(const std::string& file, unsigned int line);
 
 private:
-  //! Flag to indicate the worker thread is to exit
-  volatile bool m_exit;
+    //! Flag to indicate the worker thread is to exit
+    volatile bool m_exit;
 
-  //! Flag to indicate there is work to do
-  volatile bool m_work_to_do;
+    //! Flag to indicate there is work to do
+    volatile bool m_work_to_do;
 
-  //! Error from last cuda call
-  error_t m_last_error;
+    //! Error from last cuda call
+    error_t m_last_error;
 
-  //! Tagged file
-  std::string m_tagged_file;
+    //! Tagged file
+    std::string m_tagged_file;
 
-  //! Tagged line
-  unsigned int m_tagged_line;
+    //! Tagged line
+    unsigned int m_tagged_line;
 
-  //! The queue of function calls to make
-  std::deque< std::function< error_t (void) > > m_work_queue;
+    //! The queue of function calls to make
+    std::deque<std::function<error_t(void)> > m_work_queue;
 
-  //! Mutex for accessing m_exit, m_work_queue, m_work_to_do, and m_last_error
-  std::mutex m_mutex;
+    //! Mutex for accessing m_exit, m_work_queue, m_work_to_do, and m_last_error
+    std::mutex m_mutex;
 
-  //! Mutex for syncing after every operation
-  std::mutex m_call_mutex;
+    //! Mutex for syncing after every operation
+    std::mutex m_call_mutex;
 
-  //! Condition variable to signal m_work_to_do = true
-  std::condition_variable m_cond_work_to_do;
+    //! Condition variable to signal m_work_to_do = true
+    std::condition_variable m_cond_work_to_do;
 
-  //! Condition variable to signal m_work_to_do = false (work is complete)
-  std::condition_variable m_cond_work_done;
+    //! Condition variable to signal m_work_to_do = false (work is complete)
+    std::condition_variable m_cond_work_done;
 
-  //! Thread
-  std::unique_ptr<std::thread> m_thread;
+    //! Thread
+    std::unique_ptr<std::thread> m_thread;
 
-  //! Worker thread loop
-  void performWorkLoop();
+    //! Worker thread loop
+    void performWorkLoop();
 };
 
-
-namespace detail
-{
+namespace detail {
 #ifdef HAVE_CUDA
 /*
  * Helper function to trap CUDA errors in the correct format
  */
-  inline ThreadWorker::error_t cudaFunc(const std::function<cudaError_t (void) > &func)
-  {
+inline ThreadWorker::error_t cudaFunc(const std::function<cudaError_t(void)>& func) {
     printf("Calling");
     fflush(stdout);
     cudaError_t cudaErr = func();
     ThreadWorker::error_t success = (cudaErr == cudaSuccess ? ThreadWorker::cuda_success : ThreadWorker::cuda_error);
     return success;
-  }
-#endif
 }
+#elif HAVE_HIP
+/*
+ * Helper function to trap HIP errors in the correct format
+ */
+inline ThreadWorker::error_t hipFunc(const std::function<hipError_t(void)>& func) {
+    printf("Calling");
+    fflush(stdout);
+    hipError_t hipErr = func();
+    ThreadWorker::error_t success = (hipErr == hipSuccess ? ThreadWorker::cuda_success : ThreadWorker::cuda_error);
+    return success;
+}
+#endif
+}  // namespace detail
 
-} // threadworker
+}  // namespace threadworker

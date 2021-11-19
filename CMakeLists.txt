@@ -61,6 +61,7 @@ ENABLE_TESTING()
 
 SET(${PROJECT_NAME}_LIBS)
 SET(${PROJECT_NAME}CUDA_LIBS)
+SET(${PROJECT_NAME}HIP_LIBS)
 SET(${PROJECT_NAME}_SRCS)
 
 # Add source files
@@ -68,6 +69,7 @@ SET(${PROJECT_NAME}_SRCS
 	src/ThreadWorker.cpp)
 
 OPTION(BUILD_CUDA "Build CUDA Support" ON)
+OPTION(BUILD_HIP "Build HIP Support" ON)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -81,6 +83,13 @@ IF(BUILD_CUDA)
     	LIST(APPEND ${PROJECT_NAME}CUDA_LIBS ${CUDA_CUDART_LIBRARY} )
     ENDIF(CUDA_FOUND)
 ENDIF()
+
+# Search for rocm in common locations
+list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
+
+if(BUILD_HIP)
+    find_package(hip REQUIRED)
+endif()
 
 # Add shared library target
 ADD_LIBRARY(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SRCS})
@@ -97,7 +106,7 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${${PROJECT_NAME}_LIBS} Threads::Threads)
 
 if(CUDA_FOUND)
 	add_library(${PROJECT_NAME}CUDA SHARED ${${PROJECT_NAME}_SRCS})
-    	set_target_properties(${PROJECT_NAME}CUDA PROPERTIES COMPILE_FLAGS "-DHAVE_CUDA" )
+    set_target_properties(${PROJECT_NAME}CUDA PROPERTIES COMPILE_FLAGS "-DHAVE_CUDA" )
 	SET_TARGET_PROPERTIES( ${PROJECT_NAME}CUDA PROPERTIES
 	# create *nix style library versions + symbolic links
 	  VERSION ${MAJOR_VERSION}
@@ -112,6 +121,25 @@ if(CUDA_FOUND)
 			GROUP_READ GROUP_EXECUTE
 			WORLD_READ WORLD_EXECUTE
 			EXPORT ${PROJECT_NAME}CUDA-targets)
+endif()
+
+if(hip_FOUND)
+	add_library(${PROJECT_NAME}HIP SHARED ${${PROJECT_NAME}_SRCS})
+    set_target_properties(${PROJECT_NAME}HIP PROPERTIES COMPILE_FLAGS "-DHAVE_HIP" )
+	set_target_properties( ${PROJECT_NAME}HIP PROPERTIES
+	# create *nix style library versions + symbolic links
+	  VERSION ${MAJOR_VERSION}
+	  SOVERSION ${MAJOR_VERSION}
+	# allow creating static and shared libs without conflicts
+	  CLEAN_DIRECT_OUTPUT 1
+	# avoid conflicts between library and binary target names
+	  OUTPUT_NAME ${PROJECT_NAME}HIP )
+	target_link_libraries(${PROJECT_NAME}HIP ${${PROJECT_NAME}_LIBS} ${${PROJECT_NAME}HIP_LIBS} Threads::Threads hip::host)
+	install(TARGETS ${PROJECT_NAME}HIP DESTINATION lib
+			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+			GROUP_READ GROUP_EXECUTE
+			WORLD_READ WORLD_EXECUTE
+			EXPORT ${PROJECT_NAME}HIP-targets)
 endif()
 
 
