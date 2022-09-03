@@ -69,7 +69,7 @@ SET(${PROJECT_NAME}_SRCS
 	src/ThreadWorker.cpp)
 
 OPTION(BUILD_CUDA "Build CUDA Support" ON)
-OPTION(BUILD_HIP "Build HIP Support" ON)
+OPTION(BUILD_HIP "Build HIP Support" OFF)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
