@@ -2,45 +2,41 @@
 
 #include "ThreadWorker.h"
 
-#include <boost/bind.hpp>
+#include <chrono>
 #include <string>
 #include <sstream>
 #include <iostream>
 
-using namespace boost;
 using namespace std;
+using namespace std::chrono_literals;
 
-namespace threadworker{
+namespace threadworker {
 
 /*
 Constructing a ThreadWorker creates the worker thread
 */
-ThreadWorker::ThreadWorker() : m_exit(false), m_work_to_do(false), m_last_error(ThreadWorker::all_success)
-{
-  m_tagged_file = "n/a";
-  m_tagged_line = 0;
-  m_thread.reset(new thread(bind(&ThreadWorker::performWorkLoop, this)));
+ThreadWorker::ThreadWorker() : m_exit(false), m_work_to_do(false), m_last_error(ThreadWorker::all_success) {
+    m_tagged_file = "n/a";
+    m_tagged_line = 0;
+    m_thread.reset(new thread(bind(&ThreadWorker::performWorkLoop, this)));
 }
-
 
 /*! Shuts down the worker thread
-*/
-ThreadWorker::~ThreadWorker()
-{
-  // set the exit condition
-  {
-    boost::mutex::scoped_lock lock(m_mutex);
-    m_work_to_do = true;
-    m_exit = true;
-  }
+ */
+ThreadWorker::~ThreadWorker() {
+    // set the exit condition
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_work_to_do = true;
+        m_exit = true;
+    }
 
-  // notify the thread there is work to do
-  m_cond_work_to_do.notify_one();
+    // notify the thread there is work to do
+    m_cond_work_to_do.notify_one();
 
-  // join with the thread
-  m_thread->join();
+    // join with the thread
+    m_thread->join();
 }
-
 
 /*! \param func Function call to execute in the worker thread
 
@@ -83,22 +79,19 @@ multiple GPUs simultaneously which can only be done with asynchronous calls.
 An exception will be thrown if the CUDA call returns anything other than
 cudaSuccess.
 */
-  void ThreadWorker::call(const boost::function< ThreadWorker::error_t (void) > &func, int device)
-{
-  // this mutex lock is to prevent multiple threads from making
-  // simultaneous calls. Thus, they can depend on the exception
-  // thrown to exactly be the error from their call and not some
-  // race condition from another thread
-  // making ThreadWorker calls to a single ThreadWorker from multiple threads
-  // still isn't supported
-  boost::mutex::scoped_lock lock(m_call_mutex);
+void ThreadWorker::call(const std::function<ThreadWorker::error_t(void)>& func, int device) {
+    // this mutex lock is to prevent multiple threads from making
+    // simultaneous calls. Thus, they can depend on the exception
+    // thrown to exactly be the error from their call and not some
+    // race condition from another thread
+    // making ThreadWorker calls to a single ThreadWorker from multiple threads
+    // still isn't supported
+    std::lock_guard<std::mutex> lock(m_call_mutex);
 
-
-  // call and then sync
-  callAsync(func,device);
-  sync(device);
+    // call and then sync
+    callAsync(func, device);
+    sync(device);
 }
-
 
 /*! \param func Function to execute inside the worker thread
 
@@ -130,24 +123,26 @@ destructor of any class that passes pointers to member variables into callAsync(
 The best practice to avoid problems is to always call sync() at the end of any function
 that uses callAsync().
 */
-  void ThreadWorker::callAsync(const boost::function< ThreadWorker::error_t (void) > &func,int device)
-{
-  // add the function object to the queue
-  {
-    boost::mutex::scoped_lock lock(m_mutex);
-#ifdef HAVE_CUDA
-   if(device != -1)
+void ThreadWorker::callAsync(const std::function<ThreadWorker::error_t(void)>& func, int device) {
+    // add the function object to the queue
     {
-      m_work_queue.push_back(boost::bind(cudaSetDevice,device));
-    }
+        std::lock_guard<std::mutex> lock(m_mutex);
+#ifdef HAVE_CUDA
+        if(device != -1) {
+            m_work_queue.push_back([device] { return cudaSetDevice(device); });
+        }
+#elif HAVE_HIP
+        if(device != -1) {
+            m_work_queue.push_back([device] { return hipSetDevice(device); });
+        }
 #endif
 
-    m_work_queue.push_back(func);
-    m_work_to_do = true;
-  }
+        m_work_queue.push_back(func);
+        m_work_to_do = true;
+    }
 
-  // notify the threads there is work to do
-  m_cond_work_to_do.notify_one();
+    // notify the threads there is work to do
+    m_cond_work_to_do.notify_one();
 }
 
 /*! Call sync() to synchronize the master thread with the worker thread.
@@ -159,53 +154,65 @@ cudaThreadSynchronize()
 sync() will throw an exception if any of the queued calls resulted in
 a return value not equal to cudaSuccess.
 */
-  void ThreadWorker::sync(int device)
-{
-
+void ThreadWorker::sync(int device) {
 #ifdef HAVE_CUDA
-  if(device != -1)
-     callAsync(boost::bind(cudaDeviceSynchronize),device);
+    if(device != -1)
+        callAsync([] { return cudaDeviceSynchronize(); }, device);
+#elif HAVE_HIP
+    if(device != -1)
+        callAsync([] { return hipDeviceSynchronize(); }, device);
 #endif
-  // If we support intel offload need to wait on all streams
-  if(device != -1){
-    #pragma offload_wait target(mic:0) stream(0)
-  }
+    // If we support intel offload need to wait on all streams
+    if(device != -1) {
+#pragma offload_wait target(mic : 0) stream(0)
+    }
 
+    // wait on the work done signal
+    // wait on the work done signal
+    std::unique_lock<std::mutex> lock(m_mutex);
+    while(m_work_to_do) {
+        auto now = std::chrono::system_clock::now();
+        m_cond_work_done.wait_until(lock, now + 1000ms);
+    }
 
-  // wait on the work done signal
-  // wait on the work done signal
-  boost::mutex::scoped_lock lock(m_mutex);
-  while (m_work_to_do)
-    m_cond_work_done.timed_wait(lock, boost::posix_time::milliseconds(1000));
-
-
-  // if there was an error
-  if (m_last_error & all_error)
-  {
-    if(m_last_error & cuda_error)
-    {
+    // if there was an error
+    if(m_last_error & all_error) {
+        if(m_last_error & cuda_error) {
 #ifdef HAVE_CUDA
-    // build the exception
-    //cerr << endl << "***Error! " << string(cudaGetErrorString(m_last_error)) << " after " << m_tagged_file << ":" << m_tagged_line << endl << endl;
-      cerr << endl << "***Error! " << " after " << m_tagged_file << ":" << m_tagged_line << endl << endl;
-    //runtime_error error("CUDA Error");
+            // build the exception
+            // cerr << endl << "***Error! " << string(cudaGetErrorString(m_last_error)) << " after " << m_tagged_file <<
+            // ":" << m_tagged_line << endl << endl;
+            cerr << endl
+                 << "***Error! "
+                 << " after " << m_tagged_file << ":" << m_tagged_line << endl
+                 << endl;
+// runtime_error error("CUDA Error");
+#elif HAVE_HIP
+            // build the exception
+            // cerr << endl << "***Error! " << string(cudaGetErrorString(m_last_error)) << " after " << m_tagged_file <<
+            // ":" << m_tagged_line << endl << endl;
+            cerr << endl
+                 << "***Error! "
+                 << " after " << m_tagged_file << ":" << m_tagged_line << endl
+                 << endl;
+// runtime_error error("CUDA Error");
 #endif
-    }
-    else
-    {
-    // build the exception
-    cerr << endl << "***Error! " << " after " << m_tagged_file << ":" << m_tagged_line << endl << endl;
-    }
-    runtime_error error("Error");
+        } else {
+            // build the exception
+            cerr << endl
+                 << "***Error! "
+                 << " after " << m_tagged_file << ":" << m_tagged_line << endl
+                 << endl;
+        }
+        runtime_error error("Error");
 
-    // reset the error value so that it doesn't propagate to continued calls
-    m_last_error = all_success;
+        // reset the error value so that it doesn't propagate to continued calls
+        m_last_error = all_success;
 
-    // throw
-    throw(error);
-  }
+        // throw
+        throw(error);
+    }
 }
-
 
 /*! \param file Current file of source code
 \param line Current line of source code
@@ -213,10 +220,9 @@ a return value not equal to cudaSuccess.
 This is intended to be called worker.setTag(__FILE__, __LINE__). When reporting errors,
 the last file and line tagged will be printed to help identify where the error occured.
 */
-void ThreadWorker::setTag(const std::string &file, unsigned int line)
-{
-  m_tagged_file = file;
-  m_tagged_line = line;
+void ThreadWorker::setTag(const std::string& file, unsigned int line) {
+    m_tagged_file = file;
+    m_tagged_line = line;
 }
 
 /*! \internal
@@ -227,70 +233,66 @@ m_work_to_do is set to false and m_cond_work_done is notified for anyone
 interested (namely, sync()). During the work, m_exit is also checked. If m_exit
 is true, then the worker thread exits.
 */
-void ThreadWorker::performWorkLoop()
-{
-  bool working = true;
+void ThreadWorker::performWorkLoop() {
+    bool working = true;
 
-  // temporary queue to ping-pong with the m_work_queue
-  // this is done so that jobs can be added to m_work_queue while
-  // the worker thread is emptying pong_queue
-  deque< boost::function< error_t (void) > > pong_queue;
+    // temporary queue to ping-pong with the m_work_queue
+    // this is done so that jobs can be added to m_work_queue while
+    // the worker thread is emptying pong_queue
+    deque<std::function<error_t(void)> > pong_queue;
 
-  while (working)
-  {
-    // aquire the lock and wait until there is work to do
-    {
-      boost::mutex::scoped_lock lock(m_mutex);
-      while (!m_work_to_do)
-        m_cond_work_to_do.timed_wait(lock, boost::posix_time::milliseconds(1000));
+    while(working) {
+        // aquire the lock and wait until there is work to do
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            while(!m_work_to_do) {
+                auto now = std::chrono::system_clock::now();
+                m_cond_work_to_do.wait_until(lock, now + 1000ms);
+            }
+            // check for the exit condition
+            if(m_exit)
+                working = false;
 
-      // check for the exit condition
-      if (m_exit)
-        working = false;
+            // ping-pong the queues
+            pong_queue.swap(m_work_queue);
+        }
 
-      // ping-pong the queues
-      pong_queue.swap(m_work_queue);
+        // track any error that occurs in this queue
+        error_t error = all_success;
+
+        // execute any functions in the queue
+        while(!pong_queue.empty()) {
+            // cout << " at " << m_tagged_file << ":" << m_tagged_line << endl;
+            error_t tmp_error = pong_queue.front()();
+
+            // update error only if it is cudaSuccess
+            // this is done so that any error that occurs will propagate through
+            // to the next sync()
+            if(error & all_success)  // Bitwise or
+                error = tmp_error;
+
+            pong_queue.pop_front();
+        }
+
+        // reaquire the lock so we can update m_last_error and
+        // notify that we are done
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+
+            // update m_last_error only if it is cudaSuccess
+            // this is done so that any error that occurs will propagate through
+            // to the next sync()
+            if(m_last_error & all_success)
+                m_last_error = error;
+
+            // notify that we have emptied the queue, but only if the queue is actually empty
+            // (call_async() may have added something to the queue while we were executing above)
+            if(m_work_queue.empty()) {
+                m_work_to_do = false;
+                m_cond_work_done.notify_all();
+            }
+        }
     }
-
-    // track any error that occurs in this queue
-    error_t error = all_success;
-
-    // execute any functions in the queue
-    while (!pong_queue.empty())
-    {
-      // cout << " at " << m_tagged_file << ":" << m_tagged_line << endl;
-      error_t tmp_error = pong_queue.front()();
-
-      // update error only if it is cudaSuccess
-      // this is done so that any error that occurs will propagate through
-      // to the next sync()
-      if (error & all_success) // Bitwise or
-        error = tmp_error;
-
-      pong_queue.pop_front();
-    }
-
-    // reaquire the lock so we can update m_last_error and
-    // notify that we are done
-    {
-      boost::mutex::scoped_lock lock(m_mutex);
-
-      // update m_last_error only if it is cudaSuccess
-      // this is done so that any error that occurs will propagate through
-      // to the next sync()
-      if (m_last_error & all_success)
-        m_last_error = error;
-
-      // notify that we have emptied the queue, but only if the queue is actually empty
-      // (call_async() may have added something to the queue while we were executing above)
-      if (m_work_queue.empty())
-      {
-        m_work_to_do = false;
-        m_cond_work_done.notify_all();
-      }
-    }
-  }
 }
 
-} // threadworker
-
+}  // namespace threadworker

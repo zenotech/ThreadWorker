@@ -6,7 +6,7 @@ Master - Worker tasking library including CUDA support for tasking GPUs
 Dependencies:
 
 Required
- CMake, Boost ver > 1.41
- 
+ CMake > 3.1, compiler supporting c++14 or newer
+
 Optional
- CUDA, doxygen, git 
+ CUDA, doxygen
