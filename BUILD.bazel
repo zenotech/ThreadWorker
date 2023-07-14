@@ -1,0 +1,39 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@rules_cuda//cuda:defs.bzl", "cuda_library")
+
+cc_library(
+    name = "ThreadWorker",
+    srcs = ["src/ThreadWorker.cpp"],
+    hdrs = ["src/ThreadWorker.h"],
+    linkopts = ["-pthread"],
+    strip_include_prefix = "src",
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "ThreadWorkerCUDA",
+    linkshared = 1,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":CUDAThreadWorker",
+    ],
+)
+
+copy_file(name="cuda_src", src = "src/ThreadWorker.cpp", out = "ThreadWorker.cu", allow_symlink=True)
+
+cuda_library(
+    name = "CUDAThreadWorker",
+    srcs = ["ThreadWorker.cu"],
+    hdrs = ["src/ThreadWorker.h"],
+    defines = ["HAVE_CUDA=1"],
+    linkopts = ["-pthread"],
+    includes = ["src"],
+    visibility = ["//visibility:public"],
+    alwayslink = 1,
+)
+
+cc_test(
+    name = "ThreadWorkerTest",
+    srcs = ["src/ThreadWorkerTest.cpp"],
+    deps = [":ThreadWorker"],
+)

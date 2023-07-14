@@ -1,0 +1,8 @@
+module(
+    name = "threadworker",
+    compatibility_level = 1,
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.0.6")
+bazel_dep(name = "rules_cuda", version = "0.1.2")
