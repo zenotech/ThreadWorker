@@ -169,6 +169,9 @@ public:
     //! Tag the current location in the code
     void setTag(const std::string& file, unsigned int line);
 
+    //! Returns the current worker queue size
+    int queueSize() { return m_work_queue.size(); }
+
 private:
     //! Flag to indicate the worker thread is to exit
     volatile bool m_exit;
