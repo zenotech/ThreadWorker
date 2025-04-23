@@ -54,6 +54,7 @@ THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <atomic>
 #include <cstdio>
 #include <deque>
 #include <stdexcept>
@@ -174,10 +175,10 @@ public:
 
 private:
     //! Flag to indicate the worker thread is to exit
-    volatile bool m_exit;
+    std::atomic<bool> m_exit;
 
     //! Flag to indicate there is work to do
-    volatile bool m_work_to_do;
+    std::atomic<bool> m_work_to_do;
 
     //! Error from last cuda call
     error_t m_last_error;
