@@ -145,6 +145,11 @@ The best practice to avoid problems is to always call sync() at the end of any f
 that uses callAsync().
 */
 void ThreadWorker::callAsync(const std::function<ThreadWorker::error_t(void)>& func, int device) {
+    if (isCurrentThread()) {
+        call(func, device);
+        return;
+    }
+
     // add the function object to the queue
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -177,6 +182,23 @@ a return value not equal to cudaSuccess.
 */
 void ThreadWorker::sync(int device) {
     if (isCurrentThread()) {
+#ifdef HAVE_CUDA
+        if(device != -1) {
+            cudaSetDevice(device);
+            cudaError_t err = cudaDeviceSynchronize();
+            if (err != cudaSuccess) {
+                throw std::runtime_error("CUDA Error in nested sync");
+            }
+        }
+#elif HAVE_HIP
+        if(device != -1) {
+            hipSetDevice(device);
+            hipError_t err = hipDeviceSynchronize();
+            if (err != hipSuccess) {
+                throw std::runtime_error("HIP Error in nested sync");
+            }
+        }
+#endif
         return;
     }
 
