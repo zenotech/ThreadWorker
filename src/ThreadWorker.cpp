@@ -79,7 +79,28 @@ multiple GPUs simultaneously which can only be done with asynchronous calls.
 An exception will be thrown if the CUDA call returns anything other than
 cudaSuccess.
 */
+bool ThreadWorker::isCurrentThread() const {
+    return m_thread && (std::this_thread::get_id() == m_thread->get_id());
+}
+
 void ThreadWorker::call(const std::function<ThreadWorker::error_t(void)>& func, int device) {
+    if (isCurrentThread()) {
+#ifdef HAVE_CUDA
+        if(device != -1) {
+            cudaSetDevice(device);
+        }
+#elif HAVE_HIP
+        if(device != -1) {
+            hipSetDevice(device);
+        }
+#endif
+        error_t err = func();
+        if (err & all_error) {
+            throw std::runtime_error("Error in nested ThreadWorker call");
+        }
+        return;
+    }
+
     // this mutex lock is to prevent multiple threads from making
     // simultaneous calls. Thus, they can depend on the exception
     // thrown to exactly be the error from their call and not some
@@ -155,6 +176,10 @@ sync() will throw an exception if any of the queued calls resulted in
 a return value not equal to cudaSuccess.
 */
 void ThreadWorker::sync(int device) {
+    if (isCurrentThread()) {
+        return;
+    }
+
 #ifdef HAVE_CUDA
     if(device != -1)
         callAsync([] { return cudaDeviceSynchronize(); }, device);

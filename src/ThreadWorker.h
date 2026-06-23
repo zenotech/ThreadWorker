@@ -173,6 +173,9 @@ public:
     //! Returns the current worker queue size
     int queueSize() { return m_work_queue.size(); }
 
+    //! Checks if the calling thread is the worker thread itself
+    bool isCurrentThread() const;
+
 private:
     //! Flag to indicate the worker thread is to exit
     std::atomic<bool> m_exit;
